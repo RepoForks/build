@@ -53,7 +53,7 @@ Future<Null> bootstrapDdc(BuildStep buildStep,
   appModuleScope = appModuleScope.replaceAll('.', '\$46');
 
   // Map from module name to module path for custom modules.
-  var modulePaths = {'dart_sdk': 'packages/\$sdk/dev_compiler/amd/dart_sdk'};
+  var modulePaths = {'dart_sdk': 'packages/\$sdk/dev_compiler/common/dart_sdk'};
   var transitiveJsModules = [module.jsId]
     ..addAll(transitiveDeps.map((dep) => dep.jsId));
   for (var jsId in transitiveJsModules) {
@@ -68,7 +68,7 @@ Future<Null> bootstrapDdc(BuildStep buildStep,
 
   var bootstrapContent = new StringBuffer('(function() {\n');
   bootstrapContent.write(_dartLoaderSetup(modulePaths));
-  bootstrapContent.write(_requireJsConfig);
+  // bootstrapContent.write(_requireJsConfig);
 
   bootstrapContent.write(_appBootstrap(appModuleName, appModuleScope));
 
@@ -118,11 +118,30 @@ String _ddcModuleName(AssetId jsId) {
 ///
 /// Also performs other necessary initialization.
 String _appBootstrap(String moduleName, String moduleScope) => '''
-require(["$moduleName", "dart_sdk"], function(app, dart_sdk) {
+  const app = require("$moduleName");
+  const dart_sdk = require("dart_sdk");
+  
+  const dart = dart_sdk.dart;
+
+  // Unfortunately DDC treats require() as global which is not entirely true for
+  // NodeJS. We have to define it explicitly here since that is what DDC expects.
+  // TODO: reduce duplication with above override for Module.prototype.require.
+  dart.global.require = function () {
+    var id = arguments['0'];
+    if (id in modulePaths) {
+      // This is our DDC compiled module, tweak its path
+      var parts = require.main.filename.split(path.sep);
+      parts.pop();
+      parts.push(modulePaths[id]);
+      var newId = parts.join(path.sep);
+      arguments['0'] = newId;
+    }
+    return moduleRequire.apply(this, arguments);
+  }
+
   dart_sdk._isolate_helper.startRootIsolate(() => {}, []);
-$_initializeTools
+
   app.$moduleScope.main();
-});
 })();
 ''';
 
@@ -130,21 +149,7 @@ $_initializeTools
 /// run the app.
 String _entryPointJs(String bootstrapModuleName) => '''
 (function() {
-  $_currentDirectoryScript
-  $_baseUrlScript
-  var el;
-  el = document.createElement("script");
-  el.defer = true;
-  el.async = false;
-  el.src =
-    baseUrl + "packages/\$sdk/dev_compiler/web/dart_stack_trace_mapper.js";
-  document.head.appendChild(el);
-  el = document.createElement("script");
-  el.defer = true;
-  el.async = false;
-  el.src = baseUrl + "packages/\$sdk/dev_compiler/amd/require.js";
-  el.setAttribute("data-main", _currentDirectory + "$bootstrapModuleName");
-  document.head.appendChild(el);
+  require("./$bootstrapModuleName");
 })();
 ''';
 
@@ -181,29 +186,27 @@ var _currentDirectory = (function () {
 
 /// Sets up `window.$dartLoader` based on [modulePaths].
 String _dartLoaderSetup(Map<String, String> modulePaths) => '''
-$_currentDirectoryScript
-let modulePaths = ${const JsonEncoder.withIndent(" ").convert(modulePaths)};
-if(!window.\$dartLoader) {
-   window.\$dartLoader = {
-     moduleIdToUrl: new Map(),
-     urlToModuleId: new Map(),
-     rootDirectories: new Array(),
-   };
-}
-let customModulePaths = {};
-window.\$dartLoader.rootDirectories.push(_currentDirectory);
-for (let moduleName of Object.getOwnPropertyNames(modulePaths)) {
-  let modulePath = modulePaths[moduleName];
-  if (modulePath != moduleName) {
-    customModulePaths[moduleName] = modulePath;
-  }
-  var src = _currentDirectory + modulePath + '.js';
-  if (window.\$dartLoader.moduleIdToUrl.has(moduleName)) {
-    continue;
-  }
-  \$dartLoader.moduleIdToUrl.set(moduleName, src);
-  \$dartLoader.urlToModuleId.set(src, moduleName);
-}
+
+  let modulePaths = ${const JsonEncoder.withIndent(" ").convert(modulePaths)};
+
+  const path = require('path');
+
+  var Module = require('module');
+  var builtinModules = Module.builtinModules;
+  var moduleRequire = Module.prototype.require;
+
+  Module.prototype.require = function () {
+    var id = arguments['0'];
+    if (id in modulePaths) {
+      // This is our DDC compiled module, tweak its path
+      var parts = require.main.filename.split(path.sep);
+      parts.pop();
+      parts.push(modulePaths[id]);
+      var newId = parts.join(path.sep);
+      arguments['0'] = newId;
+    }
+    return moduleRequire.apply(this, arguments);
+  };
 ''';
 
 /// Code to initialize the dev tools formatter, stack trace mapper, and any

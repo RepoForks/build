@@ -74,7 +74,7 @@ Future createDevCompilerModule(
 
   request.arguments.addAll([
     '--dart-sdk-summary=$sdkSummary',
-    '--modules=amd',
+    '--modules=common',
     '-o',
     jsOutputFile.path,
   ]);
