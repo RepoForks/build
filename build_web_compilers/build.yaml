@@ -33,4 +33,4 @@ builders:
     defaults:
       generate_for:
         include: ["node/**", "web/**", "test/**_test.dart"]
-        exclude: ["test/**_vm_test.dart"]
+        exclude: ["test/**.node_test.dart", "test/**.vm_test.dart"]
