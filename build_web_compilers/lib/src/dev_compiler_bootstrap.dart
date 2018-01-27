@@ -119,7 +119,6 @@ String _ddcModuleName(AssetId jsId) {
 /// Also performs other necessary initialization.
 String _appBootstrap(String moduleName, String moduleScope) => '''
   const app = require("$moduleName");
-  const dart_sdk = require("dart_sdk");
   dart_sdk._isolate_helper.startRootIsolate(() => {}, []);
   app.$moduleScope.main();
 })();
