@@ -32,5 +32,5 @@ builders:
     auto_apply: root_package
     defaults:
       generate_for:
-        include: ["node/**"]
-        exclude: ["test/**_test.dart"]
+        include: ["node/**", "web/**", "test/**_test.dart"]
+        exclude: ["test/**_vm_test.dart"]
