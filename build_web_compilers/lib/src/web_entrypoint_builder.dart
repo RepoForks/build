@@ -23,10 +23,16 @@ enum WebCompiler {
 
 /// The top level keys supported for the `options` config for the
 /// [WebEntrypointBuilder].
-const _supportedOptions = const [_compiler, _dart2jsArgs, _buildRootAppSummary];
+const _supportedOptions = const [
+  _compiler,
+  _dart2jsArgs,
+  _buildRootAppSummary,
+  _nodePreamble,
+];
 const _buildRootAppSummary = 'build_root_app_summary';
 const _compiler = 'compiler';
 const _dart2jsArgs = 'dart2js_args';
+const _nodePreamble = 'node_preamble';
 
 /// A builder which compiles entrypoints for the web.
 ///
@@ -36,11 +42,15 @@ class WebEntrypointBuilder implements Builder {
   final List<String> dart2JsArgs;
   final bool buildRootAppSummary;
   final bool useKernel;
+  final bool nodePreamble;
 
-  const WebEntrypointBuilder(this.webCompiler,
-      {this.dart2JsArgs: const [],
-      this.useKernel: false,
-      this.buildRootAppSummary: false});
+  const WebEntrypointBuilder(
+    this.webCompiler, {
+    this.dart2JsArgs: const [],
+    this.useKernel: false,
+    this.buildRootAppSummary: false,
+    this.nodePreamble: false,
+  });
 
   factory WebEntrypointBuilder.fromOptions(BuilderOptions options) {
     validateOptions(
@@ -48,6 +58,7 @@ class WebEntrypointBuilder implements Builder {
     var compilerOption = options.config[_compiler] as String ?? 'dartdevc';
     var buildRootAppSummary =
         options.config[_buildRootAppSummary] as bool ?? false;
+    var nodePreamble = options.config[_nodePreamble] as bool ?? false;
     WebCompiler compiler;
     switch (compilerOption) {
       case 'dartdevc':
@@ -67,9 +78,12 @@ class WebEntrypointBuilder implements Builder {
           'Expected a list of strings, but got a ${dart2JsArgs.runtimeType}:');
     }
 
-    return new WebEntrypointBuilder(compiler,
-        dart2JsArgs: dart2JsArgs as List<String>,
-        buildRootAppSummary: buildRootAppSummary);
+    return new WebEntrypointBuilder(
+      compiler,
+      dart2JsArgs: dart2JsArgs as List<String>,
+      buildRootAppSummary: buildRootAppSummary,
+      nodePreamble: nodePreamble,
+    );
   }
 
   @override
@@ -90,7 +104,7 @@ class WebEntrypointBuilder implements Builder {
       await bootstrapDdc(buildStep,
           useKernel: useKernel, buildRootAppSummary: buildRootAppSummary);
     } else if (webCompiler == WebCompiler.Dart2Js) {
-      await bootstrapDart2Js(buildStep, dart2JsArgs);
+      await bootstrapDart2Js(buildStep, dart2JsArgs, nodePreamble);
     }
   }
 }

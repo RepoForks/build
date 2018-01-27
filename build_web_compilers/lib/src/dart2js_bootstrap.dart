@@ -4,8 +4,10 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:build/build.dart';
+import 'package:node_preamble/preamble.dart';
 
 import 'module_builder.dart';
 import 'modules.dart';
@@ -14,7 +16,7 @@ import 'web_entrypoint_builder.dart';
 import 'workers.dart';
 
 Future<Null> bootstrapDart2Js(
-    BuildStep buildStep, List<String> dart2JsArgs) async {
+    BuildStep buildStep, List<String> dart2JsArgs, bool nodePreamble) async {
   var dartEntrypointId = buildStep.inputId;
   var moduleId = dartEntrypointId.changeExtension(moduleExtension);
   var module = new Module.fromJson(JSON
@@ -37,6 +39,7 @@ Future<Null> bootstrapDart2Js(
   var jsOutputFile = scratchSpace.fileFor(jsOutputId);
   if (result.succeeded && await jsOutputFile.exists()) {
     log.info(result.output);
+    if (nodePreamble) addNodePreamble(jsOutputFile);
     await scratchSpace.copyOutput(jsOutputId, buildStep);
     var jsSourceMapId =
         dartEntrypointId.changeExtension(jsEntrypointSourceMapExtension);
@@ -44,4 +47,12 @@ Future<Null> bootstrapDart2Js(
   } else {
     log.severe(result.output);
   }
+}
+
+void addNodePreamble(File output) {
+  String preamble = getPreamble(minified: true);
+  String contents = output.readAsStringSync();
+  output
+    ..writeAsStringSync(preamble)
+    ..writeAsStringSync(contents, mode: FileMode.APPEND);
 }
