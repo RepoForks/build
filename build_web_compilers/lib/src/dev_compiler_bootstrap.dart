@@ -120,27 +120,7 @@ String _ddcModuleName(AssetId jsId) {
 String _appBootstrap(String moduleName, String moduleScope) => '''
   const app = require("$moduleName");
   const dart_sdk = require("dart_sdk");
-  
-  const dart = dart_sdk.dart;
-
-  // Unfortunately DDC treats require() as global which is not entirely true for
-  // NodeJS. We have to define it explicitly here since that is what DDC expects.
-  // TODO: reduce duplication with above override for Module.prototype.require.
-  dart.global.require = function () {
-    var id = arguments['0'];
-    if (id in modulePaths) {
-      // This is our DDC compiled module, tweak its path
-      var parts = require.main.filename.split(path.sep);
-      parts.pop();
-      parts.push(modulePaths[id]);
-      var newId = parts.join(path.sep);
-      arguments['0'] = newId;
-    }
-    return moduleRequire.apply(this, arguments);
-  }
-
   dart_sdk._isolate_helper.startRootIsolate(() => {}, []);
-
   app.$moduleScope.main();
 })();
 ''';
@@ -191,22 +171,41 @@ String _dartLoaderSetup(Map<String, String> modulePaths) => '''
 
   const path = require('path');
 
-  var Module = require('module');
-  var builtinModules = Module.builtinModules;
-  var moduleRequire = Module.prototype.require;
-
-  Module.prototype.require = function () {
-    var id = arguments['0'];
+  /// Resolves module [id] for Dart package names to their absolute filenames.
+  /// Regular NodeJS module IDs are returned as-is.
+  function resolveId(id) {
     if (id in modulePaths) {
-      // This is our DDC compiled module, tweak its path
       var parts = require.main.filename.split(path.sep);
       parts.pop();
       parts.push(modulePaths[id]);
       var newId = parts.join(path.sep);
-      arguments['0'] = newId;
+      return newId;
     }
+    return id;
+  };
+
+  // Override built-in `Module.require` function to resolve Dart package
+  // names to their absolute filename paths.
+  var Module = require('module');
+  var moduleRequire = Module.prototype.require;
+  Module.prototype.require = function () {
+    var id = arguments['0'];
+    arguments['0'] = resolveId(id);
     return moduleRequire.apply(this, arguments);
   };
+  // From this point each call to `require` will be able to resolve Dart package
+  // names.
+
+  const dart_sdk = require("dart_sdk");
+  const dart = dart_sdk.dart;
+
+  // There is a JS binding for `require` function in `node` package.
+  // DDC treats this binding as global and maps all calls to this function
+  // in Dart code to `dart.global.require`. We define this function here as a 
+  // proxy to our own require function.
+  dart.global.require = function (id) {
+    return require(id);
+  }
 ''';
 
 /// Code to initialize the dev tools formatter, stack trace mapper, and any
