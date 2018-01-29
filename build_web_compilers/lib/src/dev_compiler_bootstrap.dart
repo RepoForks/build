@@ -180,8 +180,8 @@ String _dartLoaderSetup(Map<String, String> modulePaths) => '''
   /// Regular NodeJS module IDs are returned as-is.
   function resolveId(id) {
     if (id in modulePaths) {
-      var parts = require.main.filename.split(path.sep);
-      parts.pop();
+      var parts = __dirname.split(path.sep);
+      parts.push(modulePaths[id]);
       parts.push(modulePaths[id]);
       var newId = parts.join(path.sep);
       return newId;
@@ -216,6 +216,7 @@ String _dartLoaderSetup(Map<String, String> modulePaths) => '''
   // can register its functionality to be exported.
   // This exports object is forwarded by the entry point JS module.
   dart.global.exports = module.exports;
+
 ''';
 
 /// Code to initialize the dev tools formatter, stack trace mapper, and any
