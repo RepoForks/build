@@ -182,7 +182,6 @@ String _dartLoaderSetup(Map<String, String> modulePaths) => '''
     if (id in modulePaths) {
       var parts = __dirname.split(path.sep);
       parts.push(modulePaths[id]);
-      parts.push(modulePaths[id]);
       var newId = parts.join(path.sep);
       return newId;
     }
