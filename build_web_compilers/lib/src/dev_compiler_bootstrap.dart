@@ -120,7 +120,9 @@ String _ddcModuleName(AssetId jsId) {
 String _appBootstrap(String moduleName, String moduleScope) => '''
   const app = require("$moduleName");
   dart_sdk._isolate_helper.startRootIsolate(() => {}, []);
-  app.$moduleScope.main();
+  // Register main app function in the bootstrap exports so that it can be
+  // invoked by the entry point JS module.
+  module.exports.main = app.$moduleScope.main;
 })();
 ''';
 
@@ -128,7 +130,11 @@ String _appBootstrap(String moduleName, String moduleScope) => '''
 /// run the app.
 String _entryPointJs(String bootstrapModuleName) => '''
 (function() {
-  require("./$bootstrapModuleName");
+  const bootstrap = require("./$bootstrapModuleName");
+  // Set this module's exports to the exports object of bootstrap module.
+  module.exports = bootstrap;
+  // Run the app which can (optionally) register more exports.
+  bootstrap.main();
 })();
 ''';
 
@@ -198,13 +204,18 @@ String _dartLoaderSetup(Map<String, String> modulePaths) => '''
   const dart_sdk = require("dart_sdk");
   const dart = dart_sdk.dart;
 
-  // There is a JS binding for `require` function in `node` package.
+  // There is a JS binding for `require` function in `node_interop` package.
   // DDC treats this binding as global and maps all calls to this function
   // in Dart code to `dart.global.require`. We define this function here as a 
   // proxy to our own require function.
   dart.global.require = function (id) {
     return require(id);
-  }
+  };
+
+  // We also expose this module's exports here so that main Dart module
+  // can register its functionality to be exported.
+  // This exports object is forwarded by the entry point JS module.
+  dart.global.exports = module.exports;
 ''';
 
 /// Code to initialize the dev tools formatter, stack trace mapper, and any
