@@ -216,6 +216,17 @@ String _dartLoaderSetup(Map<String, String> modulePaths) => '''
   // This exports object is forwarded by the entry point JS module.
   dart.global.exports = module.exports;
 
+  // Some browser-specific globals which dart_sdk.js expects to be defined.
+  dart.global.Blob = function () { };
+  dart.global.Event = function () { };
+  dart.global.window = function () { };
+  dart.global.Window = function () { };
+  dart.global.ImageData = function () { };
+  dart.global.Node = function () { };
+  // TODO: this is better to use __filename of the main.dart.js file
+  dart.global.self = {
+      location: { href: __filename }
+  };
 ''';
 
 /// Code to initialize the dev tools formatter, stack trace mapper, and any
